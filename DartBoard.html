@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="DartBoard">
+<title>DartBoard</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:#111;color:#fff;font-family:Arial,sans-serif;font-size:18px}
+button{font-size:22px;border:0;border-radius:10px;padding:14px 8px;background:#333;color:#fff;min-height:54px}
+button:active{background:#555}
+.wrap{max-width:700px;margin:auto;padding:12px}
+h1{text-align:center;margin:5px 0 12px;font-size:32px}
+.panel{background:#1d1d1d;border-radius:14px;padding:12px;margin-bottom:12px}
+.row{display:flex;gap:8px;margin:8px 0}.row>*{flex:1}
+select,input{font-size:22px;padding:12px;border-radius:9px;border:0;width:100%}
+.score{text-align:center;font-size:72px;font-weight:bold;margin:5px 0}
+.small{text-align:center;color:#bbb;font-size:16px}
+.players{display:flex;gap:8px;overflow:auto}.player{flex:1;min-width:120px;background:#292929;border-radius:10px;padding:10px;text-align:center}
+.player.active{outline:3px solid #fff}.pname{font-size:18px}.pval{font-size:42px;font-weight:bold}
+.pad{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.pad button{min-height:58px}.wide{grid-column:span 2}
+.message{text-align:center;font-size:24px;font-weight:bold;min-height:32px}
+table{width:100%;border-collapse:collapse;text-align:center;font-size:17px}th,td{border:1px solid #555;padding:7px}th{background:#292929}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>🎯 DartBoard</h1>
+
+<div id="setup" class="panel">
+  <div class="row">
+    <select id="mode">
+      <option value="501">501</option><option value="301">301</option>
+      <option value="cricket">Cricket</option><option value="shanghai">Shanghai</option>
+    </select>
+    <select id="players"><option>1</option><option>2</option><option>3</option><option>4</option></select>
+  </div>
+  <div id="startopts" class="row">
+    <select id="doubleIn"><option value="0">Départ normal</option><option value="1">Double-In</option></select>
+    <select id="doubleOut"><option value="1">Double-Out</option><option value="0">Simple-Out</option></select>
+  </div>
+  <div id="names"></div>
+  <div class="row"><button id="startBtn" type="button">▶ Démarrer</button></div>
+</div>
+
+<div id="game" class="hidden">
+  <div class="players" id="playerbar"></div>
+  <div class="panel">
+    <div class="small" id="turnlabel"></div>
+    <div class="score" id="mainscore">501</div>
+    <div class="message" id="msg"></div>
+  </div>
+
+  <div id="x01" class="panel">
+    <div class="small">Score de la volée</div>
+    <div class="score" style="font-size:48px" id="throwscore">0</div>
+    <div class="pad">
+      <button onclick="addScore(0)">0</button><button onclick="addScore(1)">1</button><button onclick="addScore(2)">2</button><button onclick="addScore(3)">3</button>
+      <button onclick="addScore(4)">4</button><button onclick="addScore(5)">5</button><button onclick="addScore(6)">6</button><button onclick="addScore(7)">7</button>
+      <button onclick="addScore(8)">8</button><button onclick="addScore(9)">9</button><button onclick="addScore(10)">10</button><button onclick="addScore(11)">11</button>
+      <button onclick="addScore(12)">12</button><button onclick="addScore(15)">15</button><button onclick="addScore(18)">18</button><button onclick="addScore(20)">20</button>
+      <button onclick="addScore(25)">25</button><button onclick="addScore(30)">30</button><button onclick="addScore(40)">40</button><button onclick="addScore(50)">50</button>
+      <button class="wide" onclick="clearThrow()">⌫ Effacer</button><button class="wide" onclick="validateX01()">✓ Valider la volée</button>
+    </div>
+    <div class="row"><button onclick="undo()">↩ Annuler</button><button onclick="newGame()">⚙ Nouvelle partie</button></div>
+  </div>
+
+  <div id="cricket" class="panel hidden">
+    <div id="cricketTable"></div>
+    <div class="small">Choisis un numéro puis S / D / T.</div>
+    <div class="row"><select id="cricketNum"><option>20</option><option>19</option><option>18</option><option>17</option><option>16</option><option>15</option><option>Bull</option></select></div>
+    <div class="row"><button onclick="markCricket(1)">S</button><button onclick="markCricket(2)">D</button><button onclick="markCricket(3)">T</button><button onclick="clearCricket()">⌫</button></div>
+    <div class="row"><button onclick="nextPlayer()">✓ Fin de volée</button><button onclick="newGame()">⚙ Nouvelle partie</button></div>
+  </div>
+
+  <div id="shanghai" class="panel hidden">
+    <div class="score" style="font-size:46px">Manche <span id="round">1</span></div>
+    <div class="small">Numéro : <b id="target">1</b> — S / D / T</div>
+    <div class="row"><button onclick="shThrow(1)">S</button><button onclick="shThrow(2)">D</button><button onclick="shThrow(3)">T</button><button onclick="shThrow(0)">0</button></div>
+    <div class="row"><button onclick="nextShanghai()">✓ Fin de volée</button><button onclick="newGame()">⚙ Nouvelle partie</button></div>
+  </div>
+</div>
+</div>
+
+<script>
+// Compatibilité iOS 12 / Safari ancien
+document.addEventListener('DOMContentLoaded', function(){
+  var b=document.getElementById('startBtn');
+  if(b){ b.addEventListener('click', function(e){ e.preventDefault(); startGame(); }, false); }
+  setupNames();
+});
+var G={mode:'',n:1,players:[],cur:0,throwScore:0,history:[],doubleIn:false,doubleOut:true,
+round:1,target:1,shMarks:[]};
+
+function $(id){return document.getElementById(id)}
+function esc(s){return s.replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function setupNames(){
+ var n=parseInt($('players').value),h='';
+ for(var i=0;i<n;i++)h+='<div class="row"><input id="name'+i+'" placeholder="Joueur '+(i+1)+'" value="'+(i==0?'Jordan':'Joueur '+(i+1))+'"></div>';
+ $('names').innerHTML=h;
+}
+$('players').onchange=setupNames;
+$('mode').onchange=function(){var m=this.value; $('startopts').className=(m=='501'||m=='301')?'row':'row hidden'};
+function startGame(){
+ try {
+ G.mode=$('mode').value;G.n=parseInt($('players').value);G.cur=0;G.history=[];G.throwScore=0;
+ G.players=[];for(var i=0;i<G.n;i++){var nm=$('name'+i).value||('Joueur '+(i+1));G.players.push({name:nm,score:(G.mode=='301'?301:501),sum:0,darts:0,marks:{}})}
+ G.doubleIn=!!parseInt($('doubleIn').value);G.doubleOut=!!parseInt($('doubleOut').value);
+ if(G.mode=='cricket'){for(var i=0;i<G.n;i++){G.players[i].score=0;G.players[i].marks={20:0,19:0,18:0,17:0,16:0,15:0,Bull:0}}}
+ if(G.mode=='shanghai'){G.round=1;G.target=1;for(var i=0;i<G.n;i++){G.players[i].score=0;G.players[i].marks={}}}
+ $('setup').className='panel hidden';$('game').className='';
+ $('x01').className=(G.mode=='501'||G.mode=='301')?'panel':'panel hidden';
+ $('cricket').className=G.mode=='cricket'?'panel':'panel hidden';
+ $('shanghai').className=G.mode=='shanghai'?'panel':'panel hidden';
+ render();
+ } catch(e) {
+   alert('Erreur de démarrage : '+e.message);
+ }
+}
+function render(){
+ var h='';for(var i=0;i<G.n;i++)h+='<div class="player '+(i==G.cur?'active':'')+'"><div class="pname">'+esc(G.players[i].name)+'</div><div class="pval">'+(G.mode=='cricket'?G.players[i].score:G.mode=='shanghai'?G.players[i].score:G.players[i].score)+'</div></div>';
+ $('playerbar').innerHTML=h;$('turnlabel').innerHTML=G.players[G.cur].name;
+ $('mainscore').innerHTML=G.players[G.cur].score;
+ $('throwscore').innerHTML=G.throwScore;
+ if(G.mode=='cricket')renderCricket();
+ if(G.mode=='shanghai'){ $('round').innerHTML=G.round;$('target').innerHTML=G.target; }
+}
+function addScore(x){G.throwScore=G.throwScore*10+x;if(G.throwScore>180)G.throwScore=x;render()}
+function clearThrow(){G.throwScore=0;render()}
+function validateX01(){
+ var p=G.players[G.cur],v=G.throwScore,before=p.score;
+ if(v<0){return} if(G.doubleIn&&!p.started){p.darts+=3;p.sum+=0;p.started=true;G.throwScore=0;nextPlayer();return}
+ var left=p.score-v;
+ var bust=(left<0)||(G.doubleOut&&left==1);
+ if(!bust&&G.doubleOut&&left==0){p.score=0;p.sum+=v;p.darts+=3;G.history.push(before);win(p.name);return}
+ if(!bust){p.score=left;p.sum+=v;p.darts+=3}
+ G.throwScore=0;
+ if(bust) $('msg').innerHTML='BUST !'; else $('msg').innerHTML='';
+ if(p.score==0){win(p.name);return} nextPlayer();
+}
+function nextPlayer(){G.cur=(G.cur+1)%G.n;G.throwScore=0;render()}
+function undo(){if(G.history.length){G.players[G.cur].score=G.history.pop();render()}}
+function win(name){$('msg').innerHTML='🏆 '+esc(name)+' gagne !';setTimeout(function(){},10)}
+function newGame(){$('game').className='hidden';$('setup').className='panel';$('msg').innerHTML='';}
+
+function markCricket(mult){
+ var p=G.players[G.cur],num=$('cricketNum').value,old=p.marks[num]||0;
+ var add=mult,marks=Math.min(3,old+add),extra=Math.max(0,old+add-3);
+ p.marks[num]=marks;
+ if(extra>0){var val=(num=='Bull'?25:parseInt(num));p.score+=extra*val}
+ renderCricket();render();
+}
+function clearCricket(){var p=G.players[G.cur],num=$('cricketNum').value;p.marks[num]=0;renderCricket();render()}
+function renderCricket(){
+ var nums=[20,19,18,17,16,15,'Bull'],h='<table><tr><th>Joueur</th>';
+ for(var j=0;j<nums.length;j++)h+='<th>'+nums[j]+'</th>';h+='<th>Pts</th></tr>';
+ for(var i=0;i<G.n;i++){var p=G.players[i];h+='<tr><td>'+esc(p.name)+'</td>';
+ for(var j=0;j<nums.length;j++){var m=p.marks[nums[j]]||0;h+='<td>'+(m==0?'—':m==1?'X':m==2?'XX':'XXX')+'</td>'}
+ h+='<td>'+p.score+'</td></tr>'}h+='</table>';$('cricketTable').innerHTML=h;
+}
+function shThrow(mult){
+ G.shMarks.push(mult);
+ if(G.shMarks.length>3)return;
+ var p=G.players[G.cur];p.score+=(G.target*mult);
+ if(G.shMarks.length==3 && G.shMarks.indexOf(1)>=0 && G.shMarks.indexOf(2)>=0 && G.shMarks.indexOf(3)>=0){win(p.name);return}
+}
+function nextShanghai(){
+ G.shMarks=[];G.cur=(G.cur+1)%G.n;
+ if(G.cur==0){G.round++;G.target++;if(G.target>20){win(G.players.reduce(function(a,b){return a.score>b.score?a:b}).name);return}}
+ render();
+}
+</script>
+</body></html>
